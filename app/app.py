@@ -13,7 +13,7 @@ st.set_page_config(
 st.title("Credit Card Fraud Detection Comparative Study")
 
 # Load dataset
-df = pd.read_csv("data/creditcard.csv")
+df = pd.read_csv("/home/vin/Desktop/FRAUD-DETECTION-RESEARCH/data/creditcard_2023.csv")
 
 # Sidebar navigation
 page = st.sidebar.selectbox(
