@@ -34,7 +34,7 @@ METRICS = {
     },
     "Naive Bayes": {
         "Imbalanced": {"Accuracy": 0.99, "Precision": 0.14, "Recall": 0.66, "F1": 0.23, "ROC-AUC": 0.9677},
-        "Balanced":   {"Accuracy": 0.99, "Precision": 0.15, "Recall": 0.65, "F1": 0.24, "ROC-AUC": None},
+        "Balanced":   {"Accuracy": 0.97, "Precision": 0.05, "Recall": 0.88, "F1": 0.10, "ROC-AUC": 0.9644},
     },
 }
 
@@ -56,8 +56,8 @@ CONFUSION_MATRICES = {
         "Balanced":   np.array([[56276, 588], [10, 88]]),
     },
     "Naive Bayes": {
-        "Imbalanced": np.array([[56465, 399], [33, 65]]),
-        "Balanced":   np.array([[56502, 362], [34, 64]]),
+        "Imbalanced": np.array([[56531, 333], [33, 65]]),
+        "Balanced":   np.array([[55386, 1478], [12, 86]]),
     },
 }
 
@@ -65,7 +65,7 @@ CONFUSION_MATRICES = {
 CM_IMAGES = {
     "Neural Network":      {"Imbalanced": "confusion_matrix_nn_imbalanced.png",  "Balanced": "confusion_matrix_nn_balanced.png"},
     "Logistic Regression": {"Imbalanced": "confusion_matrix_lr_imbalanced.png",  "Balanced": "confusion_matrix_lr_balanced.png"},
-    "Naive Bayes":         {"Imbalanced": "confusion_matrix_nb_imbalanced.png",  "Balanced": None},
+    "Naive Bayes":         {"Imbalanced": "confusion_matrix_nb_imbalanced.png",  "Balanced": "confusion_matrix_nb_balanced.png"},
 }
 
 # ─── Sidebar navigation ───────────────────────────────────────────────────────
@@ -79,10 +79,7 @@ page = st.sidebar.selectbox(
         "Model Performance",
         "Model Comparison",
         "Confusion Matrices",
-        "ROC Curves",
-        "Neural Network Training",
         "Key Insights",
-        "Threshold Tuning",
     ],
 )
 
@@ -98,7 +95,6 @@ def build_metrics_df():
                 "Precision (Fraud)": f"{m['Precision']:.2%}",
                 "Recall (Fraud)": f"{m['Recall']:.2%}",
                 "F1 (Fraud)": f"{m['F1']:.2%}",
-                "ROC-AUC": f"{m['ROC-AUC']:.4f}" if m['ROC-AUC'] else "N/A",
             })
     return pd.DataFrame(rows)
 
@@ -218,7 +214,6 @@ elif page == "Model Performance":
         col.metric("Precision (Fraud)", f"{m['Precision']:.2%}")
         col.metric("Recall (Fraud)",    f"{m['Recall']:.2%}")
         col.metric("F1 (Fraud)",        f"{m['F1']:.2%}")
-        col.metric("ROC-AUC",           f"{m['ROC-AUC']:.4f}" if m['ROC-AUC'] else "N/A")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Model Comparison
@@ -291,7 +286,6 @@ elif page == "Confusion Matrices":
         st.metric("Precision (Fraud)", f"{m['Precision']:.2%}")
         st.metric("Recall (Fraud)",    f"{m['Recall']:.2%}")
         st.metric("F1 (Fraud)",        f"{m['F1']:.2%}")
-        st.metric("ROC-AUC",           f"{m['ROC-AUC']:.4f}" if m['ROC-AUC'] else "N/A")
 
     st.markdown("---")
 
@@ -336,138 +330,6 @@ elif page == "Confusion Matrices":
             )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE: ROC Curves
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "ROC Curves":
-    st.header("ROC Curve Comparison — All Models")
-
-    # ── Combined chart ────────────────────────────────────────────────────────
-    st.subheader("All Models — Imbalanced vs Balanced")
-    style_map = {
-        ("Neural Network",      "Imbalanced"): ("navy",       "--"),
-        ("Neural Network",      "Balanced"):   ("navy",       "-"),
-        ("Logistic Regression", "Imbalanced"): ("darkorange", "--"),
-        ("Logistic Regression", "Balanced"):   ("darkorange", "-"),
-        ("Naive Bayes",         "Imbalanced"): ("green",      "--"),
-        ("Naive Bayes",         "Balanced"):   ("green",      "-"),
-    }
-    fpr_base = np.linspace(0, 1, 200)
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    for (model, dtype), (color, ls) in style_map.items():
-        auc = METRICS[model][dtype]["ROC-AUC"]
-        if auc:
-            tpr = fpr_base ** ((1 - auc) / auc)
-            label = f"{model} {dtype} (AUC={auc:.4f})"
-        else:
-            tpr = fpr_base
-            label = f"{model} {dtype} (AUC=N/A)"
-        ax.plot(fpr_base, tpr, color=color, linestyle=ls, label=label)
-    ax.plot([0,1],[0,1], "k--", label="Random Classifier (AUC=0.50)")
-    ax.set_xlabel("False Positive Rate")
-    ax.set_ylabel("True Positive Rate")
-    ax.set_title("ROC Curve Comparison — All Models")
-    ax.legend(loc="lower right", fontsize=8)
-    ax.grid(alpha=0.3)
-    st.pyplot(fig); plt.close()
-    st.caption("Note: Curves are approximated from reported AUC values, not from raw predictions.")
-
-    st.markdown("---")
-
-    # ── Per-model ROC charts ──────────────────────────────────────────────────
-    st.subheader("Per-Model ROC Curves")
-    model_colors = {
-        "Neural Network":      "navy",
-        "Logistic Regression": "darkorange",
-        "Naive Bayes":         "green",
-    }
-    roc_cols = st.columns(3)
-    for col, model in zip(roc_cols, list(METRICS.keys())):
-        fig, ax = plt.subplots(figsize=(4, 3.5))
-        for dtype, ls in [("Imbalanced", "--"), ("Balanced", "-")]:
-            auc = METRICS[model][dtype]["ROC-AUC"]
-            if auc:
-                tpr = fpr_base ** ((1 - auc) / auc)
-                label = f"{dtype} (AUC={auc:.4f})"
-            else:
-                tpr = fpr_base
-                label = f"{dtype} (AUC=N/A)"
-            ax.plot(fpr_base, tpr, color=model_colors[model], linestyle=ls, label=label)
-        ax.plot([0,1],[0,1], "k--", linewidth=0.8)
-        ax.set_xlabel("FPR", fontsize=9); ax.set_ylabel("TPR", fontsize=9)
-        ax.set_title(model, fontsize=10)
-        ax.legend(fontsize=8); ax.grid(alpha=0.3)
-        col.pyplot(fig); plt.close()
-
-    st.caption("Note: ROC-AUC available — NN Balanced: 0.9756, Naive Bayes Imbalanced: 0.9677. Others not reported in notebooks.")
-    st.markdown("---")
-    st.subheader("Neural Network — Saved ROC Images")
-    saved_cols = st.columns(3)
-    for col, (fname, cap) in zip(saved_cols, [
-        ("roc_curve_imbalanced.png", "Neural Network — Imbalanced"),
-        ("roc_curve_balanced.png",   "Neural Network — Balanced"),
-        ("roc_curve_comparison.png", "Neural Network — Comparison"),
-    ]):
-        p = os.path.join(VIZ_DIR, fname)
-        if os.path.exists(p):
-            col.image(p, caption=cap, use_container_width=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: Neural Network Training
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "Neural Network Training":
-    st.header("Neural Network Training Visualisations")
-    st.write(
-        "The following visualisations were generated during Neural Network training "
-        "on both the imbalanced and SMOTE-balanced datasets."
-    )
-
-    train_cols = st.columns(3)
-    for col, (fname, cap) in zip(train_cols, [
-        ("loss_curve.png",                    "Training Loss Curve"),
-        ("balanced_training_data_smote.png",  "Balanced Training Data (SMOTE)"),
-        ("class_distribution_imbalanced.png", "Class Distribution — Imbalanced"),
-    ]):
-        p = os.path.join(VIZ_DIR, fname)
-        if os.path.exists(p):
-            col.image(p, caption=cap, use_container_width=True)
-
-    pca_cols = st.columns(2)
-    for col, (fname, cap) in zip(pca_cols, [
-        ("pca_feature_distribution.png",   "PCA Feature Distribution"),
-        ("precision_recall_threshold.png", "Precision and Recall vs Threshold"),
-    ]):
-        p = os.path.join(VIZ_DIR, fname)
-        if os.path.exists(p):
-            col.image(p, caption=cap, use_container_width=True)
-
-    st.markdown("---")
-    st.subheader("Neural Network Performance Summary")
-    col_imb, col_bal = st.columns(2)
-    for col, dtype in zip([col_imb, col_bal], ["Imbalanced", "Balanced"]):
-        m = METRICS["Neural Network"][dtype]
-        col.subheader(dtype)
-        col.metric("Precision (Fraud)", f"{m['Precision']:.2%}")
-        col.metric("Recall (Fraud)",    f"{m['Recall']:.2%}")
-        col.metric("F1 (Fraud)",        f"{m['F1']:.2%}")
-        col.metric("ROC-AUC",           f"{m['ROC-AUC']:.4f}" if m['ROC-AUC'] else "N/A")
-        img_fname = CM_IMAGES["Neural Network"][dtype]
-        p = os.path.join(VIZ_DIR, img_fname)
-        if os.path.exists(p):
-            col.image(p, caption=f"Neural Network — {dtype}", use_container_width=True)
-        else:
-            cm = CONFUSION_MATRICES["Neural Network"][dtype]
-            fig, ax = plt.subplots(figsize=(4, 3))
-            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                        xticklabels=["Non-Fraud", "Fraud"],
-                        yticklabels=["Non-Fraud", "Fraud"], ax=ax,
-                        annot_kws={"size": 10})
-            ax.set_xlabel("Predicted", fontsize=9)
-            ax.set_ylabel("Actual", fontsize=9)
-            ax.set_title(f"Neural Network — {dtype}", fontsize=10)
-            col.pyplot(fig); plt.close()
-
-# ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Key Insights
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Key Insights":
@@ -477,112 +339,55 @@ elif page == "Key Insights":
     with col_a:
         st.subheader("Impact of Class Imbalance")
         st.markdown("""
-        - All imbalanced models show ~99–100% accuracy — this is misleading.
-        - Neural Network (Imbalanced): **83% Recall**, Precision 32%, F1 0.46.
-        - Logistic Regression (Imbalanced): **65% Recall**, best precision (83%), F1 0.73.
-        - Naive Bayes (Imbalanced): **66% Recall**, low precision (14%), F1 0.23.
+        - All imbalanced models show ~99–100% accuracy — this is **misleading**.
+        - A model that predicts every transaction as normal gets 99.83% accuracy but catches **zero fraud**.
+        - **Neural Network** (Imbalanced): Recall 83%, Precision 32%, F1 0.46
+        - **Logistic Regression** (Imbalanced): Recall 65%, Precision 83%, F1 0.73
+        - **Naive Bayes** (Imbalanced): Recall 66%, Precision 14%, F1 0.23
         """)
 
         st.subheader("Effect of SMOTE Balancing")
         st.markdown("""
-        - Recall improves across all models after SMOTE.
-        - Trade-off: more false positives (lower precision).
-        - For fraud detection, **high Recall is critical** — missing fraud is costly.
+        SMOTE creates synthetic fraud samples so the model sees equal fraud and normal during training.
+        - **Neural Network** (Balanced): Recall 87%, Precision 31%, F1 0.46
+        - **Logistic Regression** (Balanced): Recall 90%, Precision 13%, F1 0.23
+        - **Naive Bayes** (Balanced): Recall 88%, Precision 5%, F1 0.10
+
+        Trade-off: more fraud caught (higher recall) but more false alarms (lower precision).
+        For fraud detection, **missing fraud is more costly than a false alarm**, so high recall is preferred.
         """)
 
     with col_b:
-        st.subheader("Model Comparison — Balanced (from notebooks)")
+        st.subheader("Model Comparison — All Results (from notebooks)")
         st.markdown("""
-        | Model | Recall | Precision | F1 | ROC-AUC |
-        |---|---|---|---|---|
-        | Logistic Regression | **90%** | 13% | 0.23 | N/A |
-        | Neural Network | **87%** | 31% | **0.46** | **0.9756** |
-        | Naive Bayes | 65% | 15% | 0.24 | 0.9677\* |
+        **Imbalanced dataset:**
 
-        \*Naive Bayes ROC-AUC is from the imbalanced run.
+        | Model | Accuracy | Precision | Recall | F1 |
+        |---|---|---|---|---|
+        | Neural Network | 100% | 32% | 83% | 0.46 |
+        | Logistic Regression | 100% | 83% | 65% | 0.73 |
+        | Naive Bayes | 99% | 14% | 66% | 0.23 |
+
+        **Balanced (SMOTE) dataset:**
+
+        | Model | Accuracy | Precision | Recall | F1 |
+        |---|---|---|---|---|
+        | Logistic Regression | 99% | 13% | **90%** | 0.23 |
+        | Neural Network | 100% | 31% | 87% | **0.46** |
+        | Naive Bayes | 97% | 5% | 88% | 0.10 |
         """)
 
         st.subheader("Recommendation")
         st.markdown("""
-        - **Neural Network (Balanced)** — best F1 and highest ROC-AUC (0.9756).
-        - **Logistic Regression (Balanced)** — highest recall (90%), good baseline.
-        - **Naive Bayes** — fast but lowest precision and F1.
-        - Use the Threshold Tuning page to adjust the precision-recall trade-off.
+        - **Neural Network (Balanced)** — best overall F1 score (0.46), good balance of precision and recall.
+        - **Logistic Regression (Balanced)** — highest recall (90%), catches the most fraud.
+        - **Naive Bayes (Balanced)** — high recall (88%) but very low precision (5%), too many false alarms.
+        - **Logistic Regression (Imbalanced)** — best precision (83%) when false alarms must be minimised.
         """)
 
     st.info(
         "Bottom line: Never rely on accuracy alone for imbalanced datasets. "
-        "Always evaluate Recall, Precision, and ROC-AUC for fraud detection tasks."
+        "Always evaluate Recall, Precision, and F1 score for fraud detection tasks."
     )
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: Threshold Tuning
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "Threshold Tuning":
-    st.header("Threshold Tuning")
-    st.write("Select dataset preparation type to adjust the classification threshold:")
 
-    setup = st.selectbox("Dataset Setup", ["Imbalanced", "Balanced"])
-
-    st.write(
-        "Adjust the classification threshold to explore the precision-recall trade-off. "
-        "Lower threshold flags more fraud (higher recall, lower precision)."
-    )
-
-    threshold = st.slider("Classification Threshold", 0.1, 0.9, 0.5, 0.05)
-
-    base_cm = CONFUSION_MATRICES["Neural Network"][setup]
-    tn_b, fp_b, fn_b, tp_b = base_cm[0,0], base_cm[0,1], base_cm[1,0], base_cm[1,1]
-    total_fraud  = tp_b + fn_b
-    total_normal = tn_b + fp_b
-
-    recall_approx = min(1.0, (tp_b / total_fraud)  * (0.5 / threshold) ** 0.5)
-    fpr_approx    = min(1.0, (fp_b / total_normal) * (0.5 / threshold) ** 0.5)
-    tp_approx  = int(recall_approx * total_fraud)
-    fn_approx  = total_fraud - tp_approx
-    fp_approx  = int(fpr_approx * total_normal)
-    tn_approx  = total_normal - fp_approx
-    prec_approx = tp_approx / (tp_approx + fp_approx) if (tp_approx + fp_approx) > 0 else 0.0
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Recall (Fraud Caught)", f"{recall_approx:.1%}")
-    c2.metric("Precision",             f"{prec_approx:.1%}")
-    c3.metric("True Positives",        tp_approx)
-    c4.metric("False Positives",       fp_approx)
-
-    col_cm, col_chart = st.columns([1, 1])
-    with col_cm:
-        fig, ax = plt.subplots(figsize=(5, 4))
-        cm_approx = np.array([[tn_approx, fp_approx], [fn_approx, tp_approx]])
-        sns.heatmap(cm_approx, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=["Non-Fraud", "Fraud"],
-                    yticklabels=["Non-Fraud", "Fraud"], ax=ax)
-        ax.set_xlabel("Predicted Label")
-        ax.set_ylabel("Actual Label")
-        ax.set_title(f"Confusion Matrix — Neural Network ({setup}, threshold={threshold})")
-        st.pyplot(fig); plt.close()
-
-    with col_chart:
-        thresholds = np.arange(0.1, 0.95, 0.05)
-        recalls, precisions = [], []
-        for t in thresholds:
-            r = min(1.0, (tp_b / total_fraud)  * (0.5 / t) ** 0.5)
-            f = min(1.0, (fp_b / total_normal) * (0.5 / t) ** 0.5)
-            tp_t = int(r * total_fraud)
-            fp_t = int(f * total_normal)
-            p = tp_t / (tp_t + fp_t) if (tp_t + fp_t) > 0 else 0.0
-            recalls.append(r); precisions.append(p)
-
-        fig2, ax2 = plt.subplots(figsize=(5, 4))
-        ax2.plot(thresholds, recalls,    label="Recall",    color="steelblue")
-        ax2.plot(thresholds, precisions, label="Precision", color="tomato")
-        ax2.axvline(threshold, color="gray", linestyle="--", label=f"Current ({threshold})")
-        ax2.set_xlabel("Threshold")
-        ax2.set_ylabel("Score")
-        ax2.set_title(f"Precision and Recall vs Threshold ({setup})")
-        ax2.legend(); ax2.grid(alpha=0.3)
-        st.pyplot(fig2); plt.close()
-
-    st.caption(
-        "Note: Simulation is approximate — scaled from the Neural Network baseline confusion matrix."
-    )
