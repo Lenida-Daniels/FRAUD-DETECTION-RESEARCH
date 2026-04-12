@@ -170,25 +170,33 @@ elif page == "Dataset Overview":
         """)
 
     st.subheader("Exploratory Data Analysis")
+    st.caption("These charts explore the raw data before any model training.")
     eda_cols = st.columns(3)
-    for col, (fname, cap) in zip(eda_cols, [
-        ("transaction_amount_distribution.png", "Transaction Amount Distribution"),
-        ("fraud_vs_amount_boxplot.png",          "Fraud vs Amount"),
-        ("correlation_heatmap.png",              "Feature Correlation Heatmap"),
+    for col, (fname, cap, explanation) in zip(eda_cols, [
+        ("transaction_amount_distribution.png", "Transaction Amount Distribution",
+         "Most transactions are small. The long right tail shows a few very large transactions. Fraud does not only happen on large amounts."),
+        ("fraud_vs_amount_boxplot.png", "Fraud vs Amount",
+         "Fraud transactions (1) tend to have lower median amounts than normal (0). Fraudsters often test cards with small purchases first."),
+        ("correlation_heatmap.png", "Feature Correlation Heatmap",
+         "V1-V28 are PCA features — they are designed to be uncorrelated. Near-zero correlations confirm the PCA worked correctly."),
     ]):
         p = os.path.join(VIZ_DIR, fname)
         if os.path.exists(p):
             col.image(p, caption=cap, use_container_width=True)
+            col.caption(explanation)
 
-    st.subheader("Time and Transaction Distributions")
-    t_cols = st.columns(2)
-    for col, (fname, cap) in zip(t_cols, [
-        ("transaction_time_distribution.png", "Transaction Time Distribution"),
-        ("pca_feature_distribution.png",      "PCA Feature Distribution"),
-    ]):
-        p = os.path.join(VIZ_DIR, fname)
-        if os.path.exists(p):
-            col.image(p, caption=cap, use_container_width=True)
+    st.subheader("Transaction Time Distribution")
+    p = os.path.join(VIZ_DIR, "transaction_time_distribution.png")
+    if os.path.exists(p):
+        col_img, col_txt = st.columns([1, 1])
+        col_img.image(p, caption="Transaction Time Distribution", use_container_width=True)
+        col_txt.markdown("""
+        **What this shows:**
+        The histogram shows when transactions happen over time (in seconds from the first transaction).
+        Two peaks are visible, suggesting two busy periods — likely corresponding to two days of data.
+        Fraud transactions are spread across all time periods, meaning time alone is not a strong
+        indicator of fraud.
+        """)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Model Performance
@@ -202,7 +210,8 @@ elif page == "Model Performance":
         df_metrics.style.apply(highlight_balanced, axis=1),
         use_container_width=True, hide_index=True,
     )
-    st.caption("Green rows = Balanced (SMOTE). Accuracy is misleading — focus on Recall and ROC-AUC.")
+    st.caption("Green rows = Balanced (SMOTE). Accuracy is misleading — focus on Recall and F1.")
+    st.info("💡 **How to read this table:** Precision = when the model says fraud, how often is it right. Recall = of all real fraud cases, how many did the model catch. F1 = the balance between the two. For fraud detection, Recall matters most.")
 
     st.subheader("Per-Model Detail")
     sel = st.selectbox("Select Model", list(METRICS.keys()))
@@ -220,7 +229,8 @@ elif page == "Model Performance":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Model Comparison":
     st.header("Model Comparison Charts")
-    st.write("Side-by-side comparison of all models on Imbalanced vs Balanced data.")
+    st.write("Side-by-side bar charts comparing all three models on Imbalanced vs Balanced (SMOTE) data.")
+    st.info("💡 **How to read these charts:** Blue bars = trained on raw imbalanced data. Green bars = trained with SMOTE balancing. Taller green bars mean SMOTE helped the model catch more fraud. A drop in precision (green bar lower) means more false alarms — the trade-off of catching more fraud.")
 
     df_metrics = build_metrics_df()
     models = list(METRICS.keys())
@@ -253,7 +263,8 @@ elif page == "Model Comparison":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Confusion Matrices":
     st.header("Confusion Matrices — All Models")
-    st.write("Confusion matrices for all three models on both Imbalanced and Balanced datasets.")
+    st.write("Select a model and dataset type to explore the confusion matrix and what it means.")
+    st.info("💡 **How to read a confusion matrix:** The matrix has 4 boxes. Top-left = normal transactions correctly identified ✅. Top-right = normal transactions wrongly flagged as fraud ⚠️ (false alarms). Bottom-left = fraud missed by the model ❌ (the dangerous ones). Bottom-right = fraud correctly caught ✅. We want bottom-left small and bottom-right large.")
 
     # ── Interactive selector ──────────────────────────────────────────────────
     col_sel1, col_sel2 = st.columns(2)
@@ -286,6 +297,15 @@ elif page == "Confusion Matrices":
         st.metric("Precision (Fraud)", f"{m['Precision']:.2%}")
         st.metric("Recall (Fraud)",    f"{m['Recall']:.2%}")
         st.metric("F1 (Fraud)",        f"{m['F1']:.2%}")
+        st.markdown("---")
+        fraud_caught_pct = tp / (tp + fn) * 100 if (tp + fn) > 0 else 0
+        false_alarm_pct  = fp / (fp + tn) * 100 if (fp + tn) > 0 else 0
+        st.markdown(f"""
+        **In plain English:**
+        - This model caught **{tp} out of {tp+fn} fraud cases** ({fraud_caught_pct:.0f}% of all fraud).
+        - It missed **{fn} fraud cases** that slipped through undetected.
+        - It raised **{fp} false alarms** on normal transactions ({false_alarm_pct:.2f}% of normal transactions).
+        """)
 
     st.markdown("---")
 
@@ -334,60 +354,145 @@ elif page == "Confusion Matrices":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "Key Insights":
     st.header("Key Insights")
+    st.write("A plain-language explanation of what every metric, chart, and result means for this project.")
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("Impact of Class Imbalance")
-        st.markdown("""
-        - All imbalanced models show ~99–100% accuracy — this is **misleading**.
-        - A model that predicts every transaction as normal gets 99.83% accuracy but catches **zero fraud**.
-        - **Neural Network** (Imbalanced): Recall 83%, Precision 32%, F1 0.46
-        - **Logistic Regression** (Imbalanced): Recall 65%, Precision 83%, F1 0.73
-        - **Naive Bayes** (Imbalanced): Recall 66%, Precision 14%, F1 0.23
+    # ── What the metrics mean ─────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("What the Metrics Mean")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.info("**Accuracy**\n\nOut of all transactions, how many did the model label correctly. Looks great (99%) but is useless here because 99.83% of transactions are normal — a model that never flags fraud still scores 99%.")
+    c2.success("**Precision**\n\nOf all the transactions the model flagged as fraud, how many were actually fraud. Low precision = lots of false alarms (innocent customers blocked). High precision = when the model says fraud, it is usually right.")
+    c3.warning("**Recall**\n\nOf all the real fraud cases, how many did the model catch. Low recall = fraud slips through undetected. **This is the most important metric** — missing fraud costs far more than a false alarm.")
+    c4.error("**F1 Score**\n\nThe balance between Precision and Recall. A single number that penalises a model that is good at one but terrible at the other. Higher F1 = better overall fraud detector.")
+
+    # ── What the visualisations say ───────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("What the Visualisations Are Saying")
+
+    st.markdown("#### Class Distribution Chart")
+    st.markdown("""
+    The bar chart shows **284,315 normal** transactions vs only **492 fraud** transactions.
+    This extreme imbalance (0.17% fraud) is the root cause of all the challenges in this project.
+    Any model trained on this raw data will be biased towards predicting "normal" because that is
+    what it sees almost all the time.
+    """)
+
+    st.markdown("#### Transaction Amount Distribution")
+    st.markdown("""
+    Most transactions are small amounts. The distribution is heavily right-skewed — a long tail
+    of high-value transactions. This tells us that fraud does not only happen on large transactions;
+    fraudsters also make small transactions to avoid detection. The `Amount` feature alone is not
+    enough to identify fraud.
+    """)
+
+    st.markdown("#### Fraud vs Amount Box Plot")
+    st.markdown("""
+    Fraud transactions (Class 1) tend to have **lower median amounts** than normal transactions.
+    This is a known pattern — fraudsters often test stolen cards with small purchases first.
+    However, there is significant overlap, so amount alone cannot reliably separate fraud from normal.
+    """)
+
+    st.markdown("#### Correlation Heatmap")
+    st.markdown("""
+    The features V1–V28 are the result of PCA (Principal Component Analysis) — the bank anonymised
+    the real transaction features for privacy. Because PCA produces uncorrelated components by design,
+    most features show near-zero correlation with each other. The `Amount` feature shows some
+    correlation with a few V features, which is expected.
+    """)
+
+    st.markdown("#### Confusion Matrix")
+    st.markdown("""
+    The confusion matrix breaks down model predictions into four groups:
+    - **Top-left (True Negatives):** Normal transactions correctly identified as normal ✅
+    - **Top-right (False Positives):** Normal transactions wrongly flagged as fraud ⚠️ (false alarms)
+    - **Bottom-left (False Negatives):** Fraud transactions missed by the model ❌ (the dangerous ones)
+    - **Bottom-right (True Positives):** Fraud transactions correctly caught ✅
+
+    For fraud detection, we want the bottom-left number (missed fraud) to be as **small** as possible
+    and the bottom-right (caught fraud) to be as **large** as possible.
+    """)
+
+    st.markdown("#### Bar Charts (Model Comparison)")
+    st.markdown("""
+    The bar charts compare Precision, Recall, and F1 across all three models on both datasets.
+    The key story the charts tell:
+    - **Blue bars (Imbalanced):** Models have high precision but miss a lot of fraud.
+    - **Green bars (Balanced/SMOTE):** Recall jumps up significantly — models catch far more fraud —
+      but precision drops because more false alarms are generated.
+    - The Neural Network maintains the best F1 score after balancing, meaning it has the best
+      trade-off between catching fraud and avoiding false alarms.
+    """)
+
+    # ── Impact of imbalance ───────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("Impact of Class Imbalance")
+    st.markdown("""
+    All three models trained on the raw imbalanced data show 99–100% accuracy — but this is
+    completely misleading. A model that simply predicts every transaction as normal would also
+    score 99.83% accuracy while catching **zero fraud**.
+
+    | Model | Accuracy | Precision | Recall | F1 | What it means |
+    |---|---|---|---|---|---|
+    | Neural Network | 100% | 32% | 83% | 0.46 | Catches 81 of 98 fraud cases but raises 172 false alarms |
+    | Logistic Regression | 100% | **83%** | 65% | **0.73** | Most precise — only 13 false alarms, but misses 34 fraud cases |
+    | Naive Bayes | 99% | 14% | 66% | 0.23 | Catches 65 fraud cases but raises 333 false alarms |
+    """)
+
+    # ── Effect of SMOTE ───────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("Effect of SMOTE Balancing")
+    st.markdown("""
+    SMOTE (Synthetic Minority Over-sampling Technique) creates artificial fraud samples during
+    training so the model sees an equal number of fraud and normal transactions. The models are
+    still tested on the original imbalanced test set so the evaluation is fair.
+
+    | Model | Accuracy | Precision | Recall | F1 | What it means |
+    |---|---|---|---|---|---|
+    | Neural Network | 100% | 31% | 87% | **0.46** | Catches 85 of 98 fraud cases — best F1 balance |
+    | Logistic Regression | 99% | 13% | **90%** | 0.23 | Catches the most fraud (88/98) but 588 false alarms |
+    | Naive Bayes | 97% | 5% | 88% | 0.10 | Catches 86 fraud cases but 1,478 false alarms — too noisy |
+
+    After SMOTE, recall improves dramatically across all models. The trade-off is more false alarms
+    (lower precision). For a bank, **missing fraud is far more costly** than investigating a false
+    alarm, so the recall improvement is worth it.
+    """)
+
+    # ── Recommendation ────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("Recommendation")
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        st.success("""
+        **Best overall: Neural Network (Balanced)**
+        - F1 = 0.46 — best balance of precision and recall
+        - Catches 85 out of 98 fraud cases
+        - Only 189 false alarms out of 56,864 normal transactions
+        - Suitable when you need both good fraud detection and manageable false alarms
         """)
-
-        st.subheader("Effect of SMOTE Balancing")
-        st.markdown("""
-        SMOTE creates synthetic fraud samples so the model sees equal fraud and normal during training.
-        - **Neural Network** (Balanced): Recall 87%, Precision 31%, F1 0.46
-        - **Logistic Regression** (Balanced): Recall 90%, Precision 13%, F1 0.23
-        - **Naive Bayes** (Balanced): Recall 88%, Precision 5%, F1 0.10
-
-        Trade-off: more fraud caught (higher recall) but more false alarms (lower precision).
-        For fraud detection, **missing fraud is more costly than a false alarm**, so high recall is preferred.
+        st.warning("""
+        **Best recall: Logistic Regression (Balanced)**
+        - Catches 88 out of 98 fraud cases (90% recall)
+        - But generates 588 false alarms
+        - Suitable when catching every fraud case is the top priority
         """)
-
-    with col_b:
-        st.subheader("Model Comparison — All Results (from notebooks)")
-        st.markdown("""
-        **Imbalanced dataset:**
-
-        | Model | Accuracy | Precision | Recall | F1 |
-        |---|---|---|---|---|
-        | Neural Network | 100% | 32% | 83% | 0.46 |
-        | Logistic Regression | 100% | 83% | 65% | 0.73 |
-        | Naive Bayes | 99% | 14% | 66% | 0.23 |
-
-        **Balanced (SMOTE) dataset:**
-
-        | Model | Accuracy | Precision | Recall | F1 |
-        |---|---|---|---|---|
-        | Logistic Regression | 99% | 13% | **90%** | 0.23 |
-        | Neural Network | 100% | 31% | 87% | **0.46** |
-        | Naive Bayes | 97% | 5% | 88% | 0.10 |
+    with col_r2:
+        st.error("""
+        **Avoid: Naive Bayes (Balanced)**
+        - High recall (88%) but only 5% precision
+        - Generates 1,478 false alarms — nearly 1 in 40 normal transactions flagged
+        - Too many false alarms to be practical in a real banking system
         """)
-
-        st.subheader("Recommendation")
-        st.markdown("""
-        - **Neural Network (Balanced)** — best overall F1 score (0.46), good balance of precision and recall.
-        - **Logistic Regression (Balanced)** — highest recall (90%), catches the most fraud.
-        - **Naive Bayes (Balanced)** — high recall (88%) but very low precision (5%), too many false alarms.
-        - **Logistic Regression (Imbalanced)** — best precision (83%) when false alarms must be minimised.
+        st.info("""
+        **Best precision: Logistic Regression (Imbalanced)**
+        - 83% precision — when it flags fraud, it is usually right
+        - But misses 34 out of 98 fraud cases (35% missed)
+        - Suitable only when false alarms are extremely costly
         """)
 
     st.info(
-        "Bottom line: Never rely on accuracy alone for imbalanced datasets. "
-        "Always evaluate Recall, Precision, and F1 score for fraud detection tasks."
+        "Bottom line: Accuracy is a misleading metric for fraud detection. "
+        "Always use Recall, Precision, and F1 score. "
+        "SMOTE balancing significantly improves the ability to catch fraud across all models."
     )
 
 
