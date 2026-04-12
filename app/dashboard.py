@@ -403,10 +403,10 @@ elif page == "Key Insights":
     st.markdown("#### Confusion Matrix")
     st.markdown("""
     The confusion matrix breaks down model predictions into four groups:
-    - **Top-left (True Negatives):** Normal transactions correctly identified as normal ✅
-    - **Top-right (False Positives):** Normal transactions wrongly flagged as fraud ⚠️ (false alarms)
-    - **Bottom-left (False Negatives):** Fraud transactions missed by the model ❌ (the dangerous ones)
-    - **Bottom-right (True Positives):** Fraud transactions correctly caught ✅
+    - **Top-left (True Negatives):** Normal transactions correctly identified as normal 
+    - **Top-right (False Positives):** Normal transactions wrongly flagged as fraud  (false alarms)
+    - **Bottom-left (False Negatives):** Fraud transactions missed by the model  (the dangerous ones)
+    - **Bottom-right (True Positives):** Fraud transactions correctly caught 
 
     For fraud detection, we want the bottom-left number (missed fraud) to be as **small** as possible
     and the bottom-right (caught fraud) to be as **large** as possible.
