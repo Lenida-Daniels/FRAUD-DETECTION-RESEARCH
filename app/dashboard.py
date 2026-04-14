@@ -211,7 +211,7 @@ elif page == "Model Performance":
         use_container_width=True, hide_index=True,
     )
     st.caption("Green rows = Balanced (SMOTE). Accuracy is misleading — focus on Recall and F1.")
-    st.info("💡 **How to read this table:** Precision = when the model says fraud, how often is it right. Recall = of all real fraud cases, how many did the model catch. F1 = the balance between the two. For fraud detection, Recall matters most.")
+    st.info(" **How to read this table:** Precision = when the model says fraud, how often is it right. Recall = of all real fraud cases, how many did the model catch. F1 = the balance between the two. For fraud detection, Recall matters most.")
 
     st.subheader("Per-Model Detail")
     sel = st.selectbox("Select Model", list(METRICS.keys()))
@@ -230,7 +230,7 @@ elif page == "Model Performance":
 elif page == "Model Comparison":
     st.header("Model Comparison Charts")
     st.write("Side-by-side bar charts comparing all three models on Imbalanced vs Balanced (SMOTE) data.")
-    st.info("💡 **How to read these charts:** Blue bars = trained on raw imbalanced data. Green bars = trained with SMOTE balancing. Taller green bars mean SMOTE helped the model catch more fraud. A drop in precision (green bar lower) means more false alarms — the trade-off of catching more fraud.")
+    st.info(" **How to read these charts:** Blue bars = trained on raw imbalanced data. Green bars = trained with SMOTE balancing. Taller green bars mean SMOTE helped the model catch more fraud. A drop in precision (green bar lower) means more false alarms — the trade-off of catching more fraud.")
 
     df_metrics = build_metrics_df()
     models = list(METRICS.keys())
@@ -264,7 +264,7 @@ elif page == "Model Comparison":
 elif page == "Confusion Matrices":
     st.header("Confusion Matrices — All Models")
     st.write("Select a model and dataset type to explore the confusion matrix and what it means.")
-    st.info("💡 **How to read a confusion matrix:** The matrix has 4 boxes. Top-left = normal transactions correctly identified ✅. Top-right = normal transactions wrongly flagged as fraud ⚠️ (false alarms). Bottom-left = fraud missed by the model ❌ (the dangerous ones). Bottom-right = fraud correctly caught ✅. We want bottom-left small and bottom-right large.")
+    st.info(" **How to read a confusion matrix:** The matrix has 4 boxes. Top-left = normal transactions correctly identified . Top-right = normal transactions wrongly flagged as fraud  (false alarms). Bottom-left = fraud missed by the model  (the dangerous ones). Bottom-right = fraud correctly caught . We want bottom-left small and bottom-right large.")
 
     # ── Interactive selector ──────────────────────────────────────────────────
     col_sel1, col_sel2 = st.columns(2)
